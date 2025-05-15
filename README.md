@@ -2,7 +2,7 @@
 
 Vergelijk huren en kopen in België op lange termijn, inclusief vastgoedgroei, inflatie en je persoonlijke inkomen.
 
-👉 Live app: [link volgt na deployment]
+👉 Live app: [(https://hurenofkopen.streamlit.app/)]
 
 ## Features
 
