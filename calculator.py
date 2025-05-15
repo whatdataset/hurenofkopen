@@ -1,4 +1,3 @@
-# calculator.py
 from utils import bereken_toekomstige_waarde
 from constants import DEFAULT_INFLATIE, DEFAULT_RENDEMENT, DEFAULT_VASTGOEDGROEI, DEFAULT_MAANDINKOMEN
 
@@ -15,7 +14,8 @@ def bereken_kopen(
     verwacht_rendement=DEFAULT_RENDEMENT,
     vastgoedgroei=DEFAULT_VASTGOEDGROEI,
     maandinkomen=DEFAULT_MAANDINKOMEN,
-    inflatie=DEFAULT_INFLATIE
+    inflatie=DEFAULT_INFLATIE,
+    andere_kosten_per_maand=0
 ):
     eigen_inbreng = woningprijs * eigen_inbreng_pct
     overige_kosten = woningprijs * overige_kosten_pct
@@ -33,6 +33,7 @@ def bereken_kopen(
     totale_onderhoud = 0
     totale_verzekering = 0
     totale_voorheffing = 0
+    totale_andere_kosten = 0
 
     huidig_inkomen = maandinkomen
 
@@ -41,20 +42,31 @@ def bereken_kopen(
         jaarlijkse_onderhoud = woningprijs * onderhoud_pct
         jaarlijkse_verzekering = verzekering_per_jaar
         jaarlijkse_voorheffing = onroerende_voorheffing
+        jaarlijkse_andere_kosten = andere_kosten_per_maand * 12
 
-        jaarlijkse_kost = jaarlijkse_lening + jaarlijkse_onderhoud + jaarlijkse_verzekering + jaarlijkse_voorheffing
+        jaarlijkse_kost = (
+            jaarlijkse_lening +
+            jaarlijkse_onderhoud +
+            jaarlijkse_verzekering +
+            jaarlijkse_voorheffing +
+            jaarlijkse_andere_kosten
+        )
         jaarlijkse_overschot = max(huidig_inkomen * 12 - jaarlijkse_kost, 0)
-
         totaal_belegd_overschot += jaarlijkse_overschot * ((1 + verwacht_rendement) ** (tijdshorizon - jaar))
 
         totale_leningkost += jaarlijkse_lening
         totale_onderhoud += jaarlijkse_onderhoud
         totale_verzekering += jaarlijkse_verzekering
         totale_voorheffing += jaarlijkse_voorheffing
+        totale_andere_kosten += jaarlijkse_andere_kosten
 
         huidig_inkomen *= (1 + inflatie)
 
-    totale_kost = eigen_inbreng + overige_kosten + totale_leningkost + totale_onderhoud + totale_verzekering + totale_voorheffing + gemiste_rendement
+    totale_kost = (
+        eigen_inbreng + overige_kosten + gemiste_rendement +
+        totale_leningkost + totale_onderhoud + totale_verzekering +
+        totale_voorheffing + totale_andere_kosten
+    )
     netto_vermogen = waarde_woning - (lening if tijdshorizon < looptijd_jaren else 0) - totale_kost + totaal_belegd_overschot
 
     return {
@@ -62,6 +74,7 @@ def bereken_kopen(
         "netto_vermogen": netto_vermogen,
         "maandlast": maandlast,
     }
+
 
 def bereken_huur(
     maandhuur,
@@ -74,33 +87,38 @@ def bereken_huur(
     overige_kosten_pct,
     verwacht_rendement=DEFAULT_RENDEMENT,
     maandinkomen=DEFAULT_MAANDINKOMEN,
-    inflatie=DEFAULT_INFLATIE
+    inflatie=DEFAULT_INFLATIE,
+    andere_kosten_per_maand=0
 ):
     totale_huur = 0
     totaal_gespaard = 0
     totale_verzekering = 0
+    totale_andere_kosten = 0
 
     huidig_inkomen = maandinkomen
 
-    # Investeer initieel bedrag dat koper had gebruikt
     initieel_belegd = woningprijs * (eigen_inbreng_pct + overige_kosten_pct)
     totaal_gespaard += bereken_toekomstige_waarde(initieel_belegd, verwacht_rendement, tijdshorizon)
 
     for jaar in range(tijdshorizon):
         huidige_huur = maandhuur * ((1 + huurindexatie) ** jaar)
         jaarlijkse_huur = huidige_huur * 12
-        totale_huur += jaarlijkse_huur
+        jaarlijkse_verzekering = verzekering_per_jaar
+        jaarlijkse_andere_kosten = andere_kosten_per_maand * 12
 
         verschil = max(maandlast_koper - huidige_huur, 0) * 12
-        overschot = max(huidig_inkomen * 12 - jaarlijkse_huur - (maandlast_koper * 12), 0)
+        overschot = max(huidig_inkomen * 12 - jaarlijkse_huur - jaarlijkse_verzekering - jaarlijkse_andere_kosten - (maandlast_koper * 12), 0)
+
+        totale_huur += jaarlijkse_huur
+        totale_verzekering += jaarlijkse_verzekering
+        totale_andere_kosten += jaarlijkse_andere_kosten
 
         totaal_gespaard += verschil * ((1 + verwacht_rendement) ** (tijdshorizon - jaar))
         totaal_gespaard += overschot * ((1 + verwacht_rendement) ** (tijdshorizon - jaar))
 
-        totale_verzekering += verzekering_per_jaar
         huidig_inkomen *= (1 + inflatie)
 
-    totale_kost = totale_huur + totale_verzekering
+    totale_kost = totale_huur + totale_verzekering + totale_andere_kosten
     netto_vermogen = totaal_gespaard - totale_kost
 
     return {
