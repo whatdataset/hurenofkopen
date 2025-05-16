@@ -9,12 +9,14 @@ import pandas as pd
 st.set_page_config(page_title="Kopen of Huren?", layout="wide")
 st.title("🏡 Huren of Kopen in Vlaanderen")
 st.markdown("""
-Vergelijk makkelijk het financiële verschil tussen een woning kopen en huren in Vlaanderen.
+Vergelijk het financiële verschil tussen een woning kopen en huren in Vlaanderen.
             
 De berekeningen gaan er van uit dat je:
 
 - dit jaar een eerste woning koopt en deze zelf bewoont  
 - het volledige verschil in de maandlasten zal beleggen aan een constant rendement
+
+Meer info over de berekeningen vind je onderaan.
 """)
 
 @st.cache_data
@@ -37,12 +39,37 @@ st.sidebar.header("Algemene instellingen")
 tijdshorizon = st.sidebar.number_input("Tijdshorizon (jaren)", 1, 40, 20)
 maandinkomen = st.sidebar.number_input("Netto maandinkomen (€)", 1000, 10000, DEFAULT_MAANDINKOMEN, step=100)
 
-rendement = st.sidebar.number_input("Rendement beleggingen (%)", 0.0, 15.0, 8.5, step=0.1) / 100
-vastgoedgroei = st.sidebar.number_input("Vastgoedgroei (%)", 0.0, 10.0, DEFAULT_VASTGOEDGROEI * 100, step=0.01) / 100
-inflatie = st.sidebar.number_input("Inflatie (%)", 0.0, 10.0, DEFAULT_INFLATIE * 100, step=0.01) / 100
+rendement = st.sidebar.number_input(
+    "Rendement beleggingen (%)",
+    min_value=0.0,
+    max_value=15.0,
+    value=8.5,
+    step=0.1,
+    help="Verwacht nominaal jaarlijks rendement van je belegging. Historisch gemiddelde aandelenrendement sinds 1970 is ~ 9%.") / 100
+
+
+vastgoedgroei = st.sidebar.number_input(
+    "Vastgoedgroei (%)",
+    min_value=0.0,
+    max_value=10.0,
+    value=DEFAULT_VASTGOEDGROEI * 100,
+    step=0.01,
+    help="Verwachte nominale jaarlijkse waardestijging van je vastgoed. Historisch gemiddelde waardestijging in België sinds 1970 is ~ 2% boven inflatie."
+) / 100
+
+
+inflatie = st.sidebar.number_input(
+    "Inflatie (%)",
+    min_value=0.0,
+    max_value=10.0,
+    value=DEFAULT_INFLATIE * 100,
+    step=0.01,
+    help="Gemiddelde jaarlijkse inflatie. Gebaseerd op 2% doel van de ECB."
+) / 100
 
 # Selectie woonplaats
 st.sidebar.header("Woonplaats")
+st.sidebar.caption("Deze gegevens zijn nodig om de correcte onroerende voorheffing te berekenen.")
 gekozen_provincie = st.sidebar.selectbox("Provincie", sorted(provincie_df["Provincie"].unique()))
 gekozen_gemeente = st.sidebar.selectbox("Gemeente", sorted(gemeente_df["Gemeente"].unique()))
 
@@ -63,11 +90,28 @@ col_koper, col_huurder = st.columns(2)
 with col_koper:
     st.markdown("### Kopen")
     woningprijs = st.number_input("Woningprijs (€)", 50000, 2000000, 380000, step=1000)
-    overige_kosten_pct = st.number_input("Aankoopkosten (andere) (%)", 0.0, 10.0, 4.5, step=0.1) / 100
+    overige_kosten_pct = st.number_input(
+    "Aankoopkosten (andere) (%)",
+    min_value=0.0,
+    max_value=10.0,
+    value=4.5,
+    step=0.1,
+    help=(
+        "Schatting voor de aankoop van een eerste woning in Vlaanderen. Bevat registratierechten (2%), notariskosten, aktekosten en kosten voor de lening. "
+    )) / 100
     eigen_inbreng_pct = st.number_input("Eigen inbreng (%)", 0.0, 100.0, 20.0, step=1.0) / 100
     rentevoet = st.number_input("Rentevoet lening (%)", 0.0, 10.0, 3.0, step=0.01) / 100
     looptijd = st.number_input("Looptijd lening (jaren)", 1, 40, 25)
-    onderhoud_pct = st.number_input("Onderhoud (% woningwaarde / jaar)", 0.0, 5.0, 1.5, step=0.1) / 100
+    onderhoud_pct = st.number_input(
+    "Onderhoud (% van woningwaarde / jaar)",
+    min_value=0.0,
+    max_value=5.0,
+    value=1.5,
+    step=0.1,
+    help=(
+        "Jaarlijkse kosten voor onderhoud en herstellingen. Gangbare vuistregel op langere termijn is 1.5%."
+    )
+        ) / 100
     verzekering_koper = st.number_input("Verzekering koper (€)", 0, 2000, 400)
     andere_kosten_koper = st.number_input("Andere kosten koper (€ / maand)", 0, 5000, 0)
 
@@ -116,7 +160,7 @@ defleerfactor = (1 + inflatie) ** tijdshorizon
 netto_koper_reëel = koper['netto_vermogen'] / defleerfactor
 netto_huurder_reëel = huurder['netto_vermogen'] / defleerfactor
 
-st.subheader(f"📊 Netto Vermogen na {tijdshorizon} jaar (in reële euro's van vandaag)")
+st.subheader(f"Netto Vermogen na {tijdshorizon} jaar (in reële euro's van vandaag)")
 col1, col2 = st.columns(2)
 col1.metric("Kopen", f"€ {netto_koper_reëel:,.0f}")
 col2.metric("Huren", f"€ {netto_huurder_reëel:,.0f}")
@@ -172,3 +216,66 @@ ax.set_xticks([jaar for jaar in jaren if jaar % 5 == 0 or jaar == 1])
 ax.set_xticklabels([str(jaar) for jaar in jaren if jaar % 5 == 0 or jaar == 1])
 ax.legend(loc="upper left")
 st.pyplot(fig)
+
+
+st.markdown(r"""
+---
+## Berekeningsmethode
+
+Finale bedragen zijn uitgedrukt in **reële euro's**.
+
+### Netto vermogen bij kopen
+
+We berekenen:
+""")
+st.markdown("### 1. Maandlast lening")
+
+st.latex(r"M = L \cdot \frac{r(1 + r)^n}{(1 + r)^n - 1}")
+
+st.markdown("""
+waar:
+
+- \(L\): geleend bedrag  
+- \(r\): maandrentevoet  
+- \(n\): looptijd in maanden
+""")
+
+st.markdown("### 2. Jaarlijkse uitgaven")
+
+st.latex(r"K_{\text{koper}}(t) = M \cdot 12 + \text{OV} + \text{Onderhoud} + \text{Verzekering} + \text{Andere kosten}")
+
+st.markdown("### 3. Jaarlijks overschot")
+
+st.latex(r"S_{\text{koper}}(t) = \max(I(t) - K_{\text{koper}}(t),\ 0)")
+
+st.markdown("### 4. Belegd overschot")
+
+st.latex(r"B_{\text{koper}} = \sum_{t=1}^{T} S_{\text{koper}}(t) \cdot (1 + r_{\text{inv}})^{T - t}")
+
+st.markdown("### 5. Netto vermogen koper")
+
+st.latex(r"V_{\text{koper}} = \text{Woningwaarde}(T) - \text{Restschuld}(T) + B_{\text{koper}}")
+
+st.latex(r"\text{Woningwaarde}(T) = W_0 \cdot (1 + g_{\text{vastgoed}})^T")
+
+st.latex(r"\text{Reële waarde} = \frac{V_{\text{koper}}}{(1 + \pi)^T}")
+
+st.markdown("### Netto vermogen bij huren")
+
+st.markdown("#### 1. Jaarlijkse huuruitgaven")
+
+st.latex(r"K_{\text{huurder}}(t) = H_0 \cdot (1 + g_{\text{huur}})^t \cdot 12 + \text{Verzekering} + \text{Andere kosten}")
+
+st.markdown("#### 2. Jaarlijks belegbaar bedrag")
+
+st.latex(r"S_{\text{huurder}}(t) = \max(I(t) - K_{\text{huurder}}(t),\ 0) + \max(M - H_t,\ 0) \cdot 12")
+
+st.markdown("#### 3. Totaal belegd vermogen")
+
+st.latex(r"B_{\text{huurder}} = \sum_{t=1}^{T} S_{\text{huurder}}(t) \cdot (1 + r_{\text{inv}})^{T - t}")
+
+st.markdown("#### 4. Netto vermogen huurder")
+
+st.latex(r"V_{\text{huurder}} = B_{\text{huurder}}")
+
+st.latex(r"\text{Reële waarde} = \frac{V_{\text{huurder}}}{(1 + \pi)^T}")
