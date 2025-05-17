@@ -1,6 +1,10 @@
 from utils import bereken_toekomstige_waarde
 from constants import DEFAULT_INFLATIE, DEFAULT_RENDEMENT, DEFAULT_VASTGOEDGROEI, DEFAULT_MAANDINKOMEN
 
+import numpy as np
+from utils import bereken_toekomstige_waarde
+from constants import DEFAULT_INFLATIE, DEFAULT_RENDEMENT, DEFAULT_VASTGOEDGROEI, DEFAULT_MAANDINKOMEN
+
 def bereken_kopen(
     woningprijs,
     overige_kosten_pct,
@@ -22,10 +26,9 @@ def bereken_kopen(
     lening = woningprijs - eigen_inbreng
 
     if tijdshorizon == 0:
-        netto_start = woningprijs - lening + overige_kosten
         return {
             "totale_kost": 0,
-            "netto_vermogen": netto_start,
+            "netto_vermogen": eigen_inbreng + overige_kosten,
             "maandlast": 0,
         }
 
@@ -33,55 +36,45 @@ def bereken_kopen(
     maanden = looptijd_jaren * 12
     maandlast = lening * (maandrente * (1 + maandrente)**maanden) / ((1 + maandrente)**maanden - 1)
 
-    waarde_woning = woningprijs * ((1 + vastgoedgroei) ** tijdshorizon)
-    gemiste_rendement = bereken_toekomstige_waarde(eigen_inbreng + overige_kosten, verwacht_rendement, tijdshorizon)
+    # Bereken maandelijkse aflossingen
+    aflossing_per_maand = []
+    resterende_lening = lening
+    for maand in range(maanden):
+        rente = resterende_lening * maandrente
+        aflossing = maandlast - rente
+        aflossing_per_maand.append(aflossing)
+        resterende_lening -= aflossing
+    jaarlijkse_aflossingen = np.add.reduceat(aflossing_per_maand, np.arange(0, len(aflossing_per_maand), 12))
 
     totaal_belegd_overschot = 0
-    totale_leningkost = 0
-    totale_onderhoud = 0
-    totale_verzekering = 0
-    totale_voorheffing = 0
-    totale_andere_kosten = 0
-
+    totale_kost = 0
     huidig_inkomen = maandinkomen
-    startwaarde = woningprijs - lening  # waarde van woning op t = 0
+    resterende_lening = lening
 
-    for jaar in range(tijdshorizon):
-        jaarlijkse_lening = maandlast * 12 if jaar < looptijd_jaren else 0
-        jaarlijkse_onderhoud = woningprijs * onderhoud_pct
-        jaarlijkse_verzekering = verzekering_per_jaar
-        jaarlijkse_voorheffing = onroerende_voorheffing
-        jaarlijkse_andere_kosten = andere_kosten_per_maand * 12
+    for jaar in range(1, tijdshorizon + 1):
+        woningwaarde = woningprijs * ((1 + vastgoedgroei) ** jaar)
 
-        jaarlijkse_kost = (
-            jaarlijkse_lening +
-            jaarlijkse_onderhoud +
-            jaarlijkse_verzekering +
-            jaarlijkse_voorheffing +
-            jaarlijkse_andere_kosten
-        )
-        jaarlijkse_overschot = max(huidig_inkomen * 12 - jaarlijkse_kost, 0)
-        totaal_belegd_overschot += jaarlijkse_overschot * ((1 + verwacht_rendement) ** (tijdshorizon - jaar))
+        if jaar == 1:
+            # aankoopmoment: cash wordt woning
+            vermogen = woningwaarde - lening - overige_kosten
+            gemiste_rendement = bereken_toekomstige_waarde(overige_kosten, verwacht_rendement, tijdshorizon - jaar + 1)
+            totale_kost += overige_kosten + gemiste_rendement
+        else:
+            if jaar <= looptijd_jaren:
+                resterende_lening -= jaarlijkse_aflossingen[jaar - 2]
 
-        totale_leningkost += jaarlijkse_lening
-        totale_onderhoud += jaarlijkse_onderhoud
-        totale_verzekering += jaarlijkse_verzekering
-        totale_voorheffing += jaarlijkse_voorheffing
-        totale_andere_kosten += jaarlijkse_andere_kosten
+            jaarlijkse_kost = (
+                maandlast * 12 if jaar <= looptijd_jaren else 0
+            ) + woningprijs * onderhoud_pct + verzekering_per_jaar + onroerende_voorheffing + andere_kosten_per_maand * 12
+
+            jaarlijkse_overschot = max(huidig_inkomen * 12 - jaarlijkse_kost, 0)
+            totaal_belegd_overschot += jaarlijkse_overschot * ((1 + verwacht_rendement) ** (tijdshorizon - jaar))
+
+            totale_kost += jaarlijkse_kost
 
         huidig_inkomen *= (1 + inflatie)
 
-    totale_kost = (
-        overige_kosten + gemiste_rendement +
-        totale_leningkost + totale_onderhoud + totale_verzekering +
-        totale_voorheffing + totale_andere_kosten
-    )
-
-    netto_vermogen = (
-    waarde_woning
-    - (lening if tijdshorizon < looptijd_jaren else 0)
-    - totale_kost + totaal_belegd_overschot + startwaarde
-    )
+    netto_vermogen = woningwaarde - resterende_lening + totaal_belegd_overschot
 
     return {
         "totale_kost": totale_kost,
@@ -129,7 +122,7 @@ def bereken_huur(
         jaarlijkse_andere_kosten = andere_kosten_per_maand * 12
 
         verschil = max(maandlast_koper - huidige_huur, 0) * 12
-        overschot = max(huidig_inkomen * 12 - jaarlijkse_huur - jaarlijkse_verzekering - jaarlijkse_andere_kosten - (maandlast_koper * 12), 0)
+        overschot = max(huidig_inkomen * 12 - jaarlijkse_huur - jaarlijkse_verzekering - jaarlijkse_andere_kosten, 0)
 
         totale_huur += jaarlijkse_huur
         totale_verzekering += jaarlijkse_verzekering
