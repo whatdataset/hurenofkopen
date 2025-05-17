@@ -7,7 +7,7 @@ import pandas as pd
 
 st.set_page_config(
     page_title="Kopen of Huren?",
-    page_icon="🏡",   # ← this sets the favicon to the emoji!
+    page_icon="🏡",
     layout="wide"
 )
 
@@ -77,6 +77,17 @@ gem_opcentiemen = gemeente_df[gemeente_df["Gemeente"] == gekozen_gemeente]["Geme
 basisvoet = 0.025
 basisheffing = gki * basisvoet
 onroerende_voorheffing = basisheffing * (1 + gem_opcentiemen/100 + prov_opcentiemen/100)
+
+st.sidebar.markdown(
+    """
+    <div style='text-align: center; padding-top: 30px;'>
+        <a href='https://www.buymeacoffee.com/deschouwerp' target='_blank'>
+            <img src='https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png' alt='Buy Me a Coffee' height='45'>
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 ## Pagina opbouw
 st.title("🏡 Huren of Kopen in Vlaanderen?")
