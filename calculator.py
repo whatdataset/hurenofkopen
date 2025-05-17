@@ -72,7 +72,7 @@ def bereken_kopen(
         huidig_inkomen *= (1 + inflatie)
 
     totale_kost = (
-        eigen_inbreng + overige_kosten + gemiste_rendement +
+        overige_kosten + gemiste_rendement +
         totale_leningkost + totale_onderhoud + totale_verzekering +
         totale_voorheffing + totale_andere_kosten
     )
