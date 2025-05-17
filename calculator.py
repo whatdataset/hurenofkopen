@@ -21,6 +21,14 @@ def bereken_kopen(
     overige_kosten = woningprijs * overige_kosten_pct
     lening = woningprijs - eigen_inbreng
 
+    if tijdshorizon == 0:
+        netto_start = woningprijs - lening + overige_kosten
+        return {
+            "totale_kost": 0,
+            "netto_vermogen": netto_start,
+            "maandlast": 0,
+        }
+
     maandrente = rentevoet / 12
     maanden = looptijd_jaren * 12
     maandlast = lening * (maandrente * (1 + maandrente)**maanden) / ((1 + maandrente)**maanden - 1)
@@ -36,6 +44,7 @@ def bereken_kopen(
     totale_andere_kosten = 0
 
     huidig_inkomen = maandinkomen
+    startwaarde = woningprijs - lening  # waarde van woning op t = 0
 
     for jaar in range(tijdshorizon):
         jaarlijkse_lening = maandlast * 12 if jaar < looptijd_jaren else 0
@@ -67,7 +76,12 @@ def bereken_kopen(
         totale_leningkost + totale_onderhoud + totale_verzekering +
         totale_voorheffing + totale_andere_kosten
     )
-    netto_vermogen = waarde_woning - (lening if tijdshorizon < looptijd_jaren else 0) - totale_kost + totaal_belegd_overschot
+
+    netto_vermogen = (
+    waarde_woning
+    - (lening if tijdshorizon < looptijd_jaren else 0)
+    - totale_kost + totaal_belegd_overschot + startwaarde
+    )
 
     return {
         "totale_kost": totale_kost,
@@ -98,6 +112,14 @@ def bereken_huur(
     huidig_inkomen = maandinkomen
 
     initieel_belegd = woningprijs * (eigen_inbreng_pct + overige_kosten_pct)
+
+    if tijdshorizon == 0:
+        return {
+            "totale_kost": 0,
+            "netto_vermogen": initieel_belegd,
+        }
+
+    # Tel belegd bedrag als startwaarde die meegroeit
     totaal_gespaard += bereken_toekomstige_waarde(initieel_belegd, verwacht_rendement, tijdshorizon)
 
     for jaar in range(tijdshorizon):
