@@ -63,7 +63,7 @@ inflatie = st.sidebar.number_input(
 
 # Selectie woonplaats
 st.sidebar.header("Woonplaats")
-st.sidebar.caption("Deze gegevens zijn nodig om de correcte onroerende voorheffing te berekenen.")
+st.sidebar.caption("Voor berekening onroerende voorheffing.")
 gekozen_provincie = st.sidebar.selectbox("Provincie", sorted(provincie_df["Provincie"].unique()))
 gekozen_gemeente = st.sidebar.selectbox("Gemeente", sorted(gemeente_df["Gemeente"].unique()))
 
