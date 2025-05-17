@@ -6,10 +6,39 @@ from matplotlib.ticker import FuncFormatter
 import pandas as pd
 
 st.set_page_config(
-    page_title="Kopen of Huren?",
+    page_title="Huren of Kopen?",
     page_icon="🏡",
     layout="wide"
 )
+
+
+st.markdown("""
+<style>
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.blink {
+  animation: blink 1s infinite;
+  color: white;
+}
+</style>
+
+<div style="font-size: 16px; color: white;">
+<span class="blink" style="font-size:20px;">↖</span> <b> Mobiel:</b> vergeet de algemene instellingen niet.
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
+    /* Move up the sidebar content slightly */
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: -10rem;
+        margin-top: -5rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -63,11 +92,13 @@ inflatie = st.sidebar.number_input(
 
 # Selectie woonplaats
 st.sidebar.header("Woonplaats")
-st.sidebar.caption("Voor berekening onroerende voorheffing.")
-gekozen_provincie = st.sidebar.selectbox("Provincie", sorted(provincie_df["Provincie"].unique()))
-gekozen_gemeente = st.sidebar.selectbox("Gemeente", sorted(gemeente_df["Gemeente"].unique()))
+gekozen_provincie = st.sidebar.selectbox("Provincie", sorted(provincie_df["Provincie"].unique()),
+                                         help="Dit bepaalt de provinciale opcentiemen voor de onroerende voorheffing.")
+gekozen_gemeente = st.sidebar.selectbox("Gemeente", sorted(gemeente_df["Gemeente"].unique()),
+                                            help="Dit bepaalt de gemeentelijke opcentiemen voor de onroerende voorheffing.")
 
-gki = st.sidebar.number_input("Geïndexeerd kadastraal inkomen (€)", min_value=500, max_value=10000, value=2500)
+gki = st.sidebar.number_input("Geïndexeerd kadastraal inkomen (€)", min_value=500, max_value=10000, value=2500,
+                              help = "Betreffende het aan te kopen huis. De huidige indexatie van het kadastraal inkomen is 218%")
 
 # Lookup opcentiemen
 prov_opcentiemen = provincie_df[provincie_df["Provincie"] == gekozen_provincie]["Provinciale Opcentiemen"].values[0]
@@ -91,7 +122,11 @@ st.sidebar.markdown(
 
 ## Pagina opbouw
 st.title("🏡 Huren of Kopen in Vlaanderen?")
-st.markdown(f"""
+
+col1, col2 = st.columns([1.2, 1])
+
+with col1:
+    st.markdown(f"""
 Vergelijk het **financiële** verschil tussen een woning kopen en huren in Vlaanderen.
             
 De berekeningen gaan er van uit dat je:
@@ -99,9 +134,28 @@ De berekeningen gaan er van uit dat je:
 - dit jaar een eerste woning koopt en deze zelf bewoont  
 - het volledige verschil in de maandlasten zal beleggen aan een constant rendement van **{rendement * 100:.1f}%**  
 - de eigen inbreng en aankoopkosten meteen zal beleggen aan een constant rendement van **{rendement * 100:.1f}%**
+- de woningwaarde elk jaar met **{vastgoedgroei * 100:.1f}%** stijgt
 
 Meer info over de berekeningen vind je onderaan.
 """)
+
+with col2:
+    st.markdown('<div id="model-image">', unsafe_allow_html=True)
+    st.image("assets/model.png")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+/* Hide model image on screens smaller than 768px */
+@media screen and (max-width: 768px) {
+    #model-image {
+        display: none;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 
 # Invoer kopen/huur
 col_koper, col_huurder = st.columns(2)
@@ -138,7 +192,8 @@ with col_koper:
 with col_huurder:
     st.markdown("### Huren")
     maandhuur = st.number_input("Start huurprijs (€)", 300, 5000, 1000)
-    huurindexatie = st.number_input("Huurindexatie (%)", 0.0, 10.0, 2.0, step=0.01) / 100
+    huurindexatie = st.number_input("Huurindexatie (%)", 0.0, 10.0, 2.0, step=0.01,
+                                    help="Verwachte jaarlijkse stijging van de huurprijs. Volgt typisch de inflatie.") / 100
     verzekering_huur = st.number_input("Verzekering huurder (€ / jaar)", 0, 2000, 200)
     andere_kosten_huurder = st.number_input("Andere kosten huurder (€ / maand)", 0, 5000, 0)
 
@@ -184,9 +239,10 @@ netto_koper_reëel = koper['netto_vermogen'] / defleerfactor
 netto_huurder_reëel = huurder['netto_vermogen'] / defleerfactor
 
 st.subheader(f"Netto Vermogen na {tijdshorizon} jaar (in reële euro's van vandaag)")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 col1.metric("Kopen", f"€ {netto_koper_reëel:,.0f}")
 col2.metric("Huren", f"€ {netto_huurder_reëel:,.0f}")
+col3.metric("Verschil", f"€ {netto_koper_reëel - netto_huurder_reëel:,.0f}")
 
 # Evolutie grafiek
 kopers_netto, huurders_netto, verschillen = [], [], []
@@ -243,16 +299,16 @@ with col_plot_koper:
     ax1.plot(jaren, huurders_netto, label="Huurder", linewidth=2, color="#2A9D8F")
 
     # 🔵 Markeer het startpunt van de koper (t = 0)
-    ax1.plot(jaren[0], kopers_netto[0], "o", color="tab:blue")
+    ax1.plot(jaren[0], kopers_netto[0], "o", color="tab:grey", alpha=0.7)
 
 # 📌 Annotatie met pijl en tekst boven het punt
     ax1.annotate(
-    f"€ {kopers_netto[0]:,.0f}",
+    f"Startkapitaal: € {kopers_netto[0]:,.0f}",
     xy=(jaren[0], kopers_netto[0]),
     xytext=(-tijdshorizon/7, kopers_netto[0]),  # vaste x-positie dicht bij y-as
-    arrowprops=dict(arrowstyle="->", color="tab:blue"),
-    fontsize=10,
-    color="tab:blue",
+    arrowprops=dict(arrowstyle="->", color="tab:grey"),
+    fontsize=7,
+    color="tab:grey",
     ha="right",
     va="center",
     alpha=0.7,
@@ -296,7 +352,7 @@ with col_k:
     st.markdown("- L: geleend bedrag  \n- r: maandrentevoet  \n- n: looptijd in maanden")
 
     st.markdown("**2. Jaarlijkse uitgaven**")
-    st.latex(r"K_{\text{koper}}(t) = M \cdot 12 + \text{OV} + \text{Onderhoud} + \text{Verzekering} + \text{Andere kosten}")
+    st.latex(r"K_{\text{koper}}(t) = M \cdot 12 + \text{OV} + \text{Onderhoud} + \text{Verzekering} + \text{Andere}")
 
     st.markdown("**3. Jaarlijks overschot**")
     st.latex(r"S_{\text{koper}}(t) = \max(I(t) - K_{\text{koper}}(t),\ 0)")
@@ -313,7 +369,7 @@ with col_h:
     st.subheader("Huurder")
 
     st.markdown("**1. Jaarlijkse uitgaven**")
-    st.latex(r"K_{\text{huurder}}(t) = H_0 \cdot (1 + g_{\text{huur}})^t \cdot 12 + \text{Verzekering} + \text{Andere kosten}")
+    st.latex(r"K_{\text{huurder}}(t) = H_0 \cdot (1 + g_{\text{huur}})^t \cdot 12 + \text{Verzekering} + \text{Andere}")
 
     st.markdown("**2. Jaarlijks belegbaar bedrag**")
     st.latex(r"S_{\text{huurder}}(t) = \max(I(t) - K_{\text{huurder}}(t),\ 0) + \max(M - H_t,\ 0) \cdot 12")
